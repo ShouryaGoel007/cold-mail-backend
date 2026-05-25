@@ -1,0 +1,10 @@
+flask
+flask-cors
+requests
+beautifulsoup4
+groq
+google-auth
+google-auth-oauthlib
+google-api-python-client
+python-dotenv
+gunicorn
