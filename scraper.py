@@ -1,14 +1,9 @@
-
 import requests
 import re
 from bs4 import BeautifulSoup
 
 def scrape_linkedin_post(url, cookies):
-    """
-    Scrapes LinkedIn post using saved cookies.
-    No browser needed — works on server.
-    cookies = dict of your LinkedIn cookies
-    """
+    # Scrapes LinkedIn post using saved cookies. No browser needed.
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept-Language": "en-US,en;q=0.9",
