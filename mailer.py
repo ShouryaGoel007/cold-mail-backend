@@ -1,4 +1,3 @@
-
 import os
 import base64
 import pickle
@@ -29,18 +28,15 @@ def get_gmail_service():
 
 def send_email(to_email, subject, body, resume_bytes, resume_filename):
     service = get_gmail_service()
-
     msg = MIMEMultipart()
     msg["To"] = to_email
     msg["Subject"] = subject
     msg.attach(MIMEText(body, "plain"))
-
     attachment = MIMEBase("application", "octet-stream")
     attachment.set_payload(resume_bytes)
     encoders.encode_base64(attachment)
     attachment.add_header("Content-Disposition", f'attachment; filename="{resume_filename}"')
     msg.attach(attachment)
-
     raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
     service.users().messages().send(userId="me", body={"raw": raw}).execute()
     return True
