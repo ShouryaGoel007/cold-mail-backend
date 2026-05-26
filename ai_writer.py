@@ -21,9 +21,23 @@ def generate_email_and_subject(post_text, hr_name, user_profile, groq_api_key):
     )
 
     subject_prompt = (
-        "Write ONE email subject line under 10 words for this LinkedIn post: "
-        + post_text[:300] +
-        ". Only output the subject line."
+        "You are writing an email subject line for a cold job application email.\n\n"
+        "Based on this LinkedIn post by an HR:\n"
+        + post_text[:500] +
+        "\n\nAbout the applicant:\n"
+        + user_profile +
+        "\n\nWrite ONE subject line following these rules:\n"
+        "- Must mention the specific role or company name from the post\n"
+        "- Keep it under 8 words\n"
+        "- Be direct and professional\n"
+        "- Format like one of these examples:\n"
+        "  * Application for Data Analyst Role at Blinkit\n"
+        "  * IIT BHU Student Applying for Product Intern Role\n"
+        "  * Interested in the Growth Manager Position at Rapido\n"
+        "  * Final Year IIT BHU - Applying for Operations Intern\n"
+        "- Do NOT use vague words like Opportunity, Excited, Passionate\n"
+        "- Do NOT use punctuation like ! or ?\n"
+        "- Only output the subject line, nothing else."
     )
 
     email_res = client.chat.completions.create(
