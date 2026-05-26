@@ -11,8 +11,13 @@ from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
+os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey123")
+app.config["SESSION_COOKIE_SAMESITE"] = "None"
+app.config["SESSION_COOKIE_SECURE"] = True
+
 CORS(app, supports_credentials=True, origins="*")
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
@@ -40,29 +45,45 @@ def home():
 def auth_login():
     flow = Flow.from_client_config(CREDENTIALS_INFO, scopes=SCOPES)
     flow.redirect_uri = REDIRECT_URI
+    # Pass state directly in URL instead of session
     auth_url, state = flow.authorization_url(
         access_type="offline",
         include_granted_scopes="true",
-        prompt="consent"
+        prompt="consent",
+        state="coldmailstate123"  # fixed state instead of session
     )
-    session["state"] = state
     return jsonify({"auth_url": auth_url})
 
 
 @app.route("/oauth2callback", methods=["GET"])
 def oauth2callback():
     try:
-        state = session.get("state")
-        flow = Flow.from_client_config(CREDENTIALS_INFO, scopes=SCOPES, state=state)
+        # Use fixed state — no session needed
+        flow = Flow.from_client_config(
+            CREDENTIALS_INFO,
+            scopes=SCOPES,
+            state="coldmailstate123"
+        )
         flow.redirect_uri = REDIRECT_URI
-        flow.fetch_token(authorization_response=request.url)
+
+        # Get the full URL including https
+        auth_response = request.url
+        if auth_response.startswith("http://"):
+            auth_response = auth_response.replace("http://", "https://", 1)
+
+        flow.fetch_token(authorization_response=auth_response)
         creds = flow.credentials
+
         token_b64 = base64.b64encode(pickle.dumps(creds)).decode("utf-8")
+
         service = build("gmail", "v1", credentials=creds)
         profile = service.users().getProfile(userId="me").execute()
         user_email = profile["emailAddress"]
+
         return redirect(f"{FRONTEND_URL}?token={token_b64}&email={user_email}")
+
     except Exception as e:
+        print("OAuth error:", str(e))
         return redirect(f"{FRONTEND_URL}?error={str(e)}")
 
 
@@ -98,10 +119,12 @@ def send():
         body = request.form.get("body")
         resume = request.files.get("resume")
         token_b64 = request.form.get("token")
+
         if not resume:
             return jsonify({"success": False, "error": "No resume uploaded"}), 400
         if not token_b64:
             return jsonify({"success": False, "error": "Please connect Gmail first"}), 401
+
         resume_bytes = resume.read()
         resume_filename = resume.filename
         creds = pickle.loads(base64.b64decode(token_b64))
@@ -114,5 +137,4 @@ def send():
 
 
 if __name__ == "__main__":
-    os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
     app.run(debug=True, port=5000)
