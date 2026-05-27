@@ -8,11 +8,11 @@ def generate_email_and_subject(post_text, hr_name, user_profile, groq_api_key):
         "The HR posted this on LinkedIn:\n---\n"
         + post_text[:2000] +
         "\n---\n\n"
-        "HR name: " + (hr_name if hr_name else "HR Manager") + "\n\n"
+        "HR name: " + (hr_name if hr_name else "Team") + "\n\n"
         "About the sender:\n"
         + user_profile +
         "\n\nWrite a short cold email (max 120 words).\n"
-        "- Reference something specific from their post\n"
+        "- Write it in relation with the post \n"
         "- Sound human, not like a bot\n"
         "- No I hope this email finds you well\n"
         "- End with one simple call to action\n"
@@ -21,9 +21,22 @@ def generate_email_and_subject(post_text, hr_name, user_profile, groq_api_key):
     )
 
     subject_prompt = (
-        "Write ONE email subject line under 10 words for this LinkedIn post: "
-        + post_text[:300] +
-        ". Only output the subject line."
+        "You are writing an email subject line for a cold job application email.\n\n"
+        "Based on this LinkedIn post by an HR:\n"
+        + post_text[:500] +
+        "\n\nAbout the applicant:\n"
+        + user_profile +
+        "\n\nWrite ONE subject line following these rules:\n"
+        "- Must mention the specific role or company name from the post\n"
+        "- Keep it under 8 words\n"
+        "- Be direct and professional\n"
+        "- Format like one of these examples:\n"
+        "  * Application for Data Analyst Role at Blinkit\n"
+        "  * Interested in the Growth Manager Position at Rapido\n"
+        "  * Final Year Student - Applying for Operations Intern\n"
+        "- Do NOT use vague words like Opportunity, Excited, Passionate\n"
+        "- Do NOT use punctuation like ! or ?\n"
+        "- Only output the subject line, nothing else."
     )
 
     email_res = client.chat.completions.create(
