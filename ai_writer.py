@@ -1,9 +1,9 @@
 from groq import Groq
 
-def generate_email_and_subject(post_text, hr_name, user_profile, groq_api_key, email_examples=""):
+def generate_email_and_subject(post_text, hr_name, user_profile, groq_api_key):
     client = Groq(api_key=groq_api_key)
 
-    email_prompt = f"""
+    email_prompt = f\"\"\"
 You are helping someone write a cold email to an HR professional.
 
 The HR posted this on LinkedIn:
@@ -24,23 +24,21 @@ Write a short cold email (max 120 words).
 - Mention resume is attached
 
 Only output the email body. Nothing else.
-"""
+\"\"\"
 
-    subject_prompt = f"Write ONE email subject line under 10 words for this LinkedIn post: {post_text[:300]}. Only output the subject line."
+    subject_prompt = f"Write ONE email subject line under 10 words for this LinkedIn post: {post_text[:300]}. Only output the subject."
 
-    email_response = client.chat.completions.create(
+    email_res = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": email_prompt}],
         max_tokens=400
     )
-
-    subject_response = client.chat.completions.create(
+    subject_res = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": subject_prompt}],
         max_tokens=50
     )
-
     return {
-        "body": email_response.choices[0].message.content,
-        "subject": subject_response.choices[0].message.content.strip()
+        "body": email_res.choices[0].message.content,
+        "subject": subject_res.choices[0].message.content.strip()
     }
