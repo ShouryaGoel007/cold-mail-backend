@@ -162,8 +162,23 @@ def generate():
         linkedin_url = data.get("linkedin_url")
         user_profile = data.get("user_profile")
         hr_name = data.get("hr_name", "")
+        company_domain = data.get("company_domain", "")
 
         post_data = scrape_linkedin_post(linkedin_url, linkedin_cookies)
+        hr_email = post_data["email_in_post"]
+
+        # If no email found in post, try Hunter.io
+        if not hr_email and hr_name and company_domain:
+            print(f"No email in post, trying Hunter for {hr_name} at {company_domain}")
+            hunter_url = "https://api.hunter.io/v2/email-finder"
+            hunter_res = http_requests.get(hunter_url, params={
+                "domain": company_domain,
+                "full_name": hr_name,
+                "api_key": os.environ.get("HUNTER_API_KEY", "")
+            })
+            hunter_data = hunter_res.json()
+            hr_email = hunter_data.get("data", {}).get("email", None)
+            print(f"Hunter found: {hr_email}")
 
         result = generate_email_and_subject(
             post_text=post_data["full_text"],
@@ -175,7 +190,7 @@ def generate():
             "success": True,
             "email_body": result["body"],
             "subject": result["subject"],
-            "hr_email": post_data["email_in_post"],
+            "hr_email": hr_email,
         })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
