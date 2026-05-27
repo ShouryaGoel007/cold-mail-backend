@@ -1,55 +1,49 @@
-from groq import Groq
 
-def generate_email_and_subject(post_text, hr_name, user_profile, groq_api_key):
+from groq import Groq
+import os
+
+def generate_email_and_subject(post_text, hr_name, user_profile, groq_api_key, email_examples=""):
     client = Groq(api_key=groq_api_key)
 
-    email_prompt = (
-        "You are helping someone write a cold email to an HR professional.\n\n"
-        "The HR posted this on LinkedIn:\n---\n"
-        + post_text[:2000] +
-        "\n---\n\n"
-        "HR name: " + (hr_name if hr_name else "Team") + "\n\n"
-        "About the sender:\n"
-        + user_profile +
-        "\n\nWrite a short cold email (max 120 words).\n"
-        "- Write it in relation with the post \n"
-        "- Sound human, not like a bot\n"
-        "- No I hope this email finds you well\n"
-        "- End with one simple call to action\n"
-        "- Mention resume is attached\n\n"
-        "Only output the email body. Nothing else."
-    )
+    email_prompt = f"""
+    You are helping someone write a cold email to an HR professional.
 
-    subject_prompt = (
-        "You are writing an email subject line for a cold job application email.\n\n"
-        "Based on this LinkedIn post by an HR:\n"
-        + post_text[:500] +
-        "\n\nAbout the applicant:\n"
-        + user_profile +
-        "\n\nWrite ONE subject line following these rules:\n"
-        "- Must mention the specific role or company name from the post\n"
-        "- Keep it under 8 words\n"
-        "- Be direct and professional\n"
-        "- Format like one of these examples:\n"
-        "  * Application for Data Analyst Role at Blinkit\n"
-        "  * Interested in the Growth Manager Position at Rapido\n"
-        "  * Final Year Student - Applying for Operations Intern\n"
-        "- Do NOT use vague words like Opportunity, Excited, Passionate\n"
-        "- Do NOT use punctuation like ! or ?\n"
-        "- Only output the subject line, nothing else."
-    )
+    {"Study these example emails and copy their exact tone and style:" if email_examples else ""}
+    {email_examples if email_examples else ""}
 
-    email_res = client.chat.completions.create(
+    The HR posted this on LinkedIn:
+    ---
+    {post_text[:2000]}
+    ---
+
+    HR name: {hr_name if hr_name else "HR Manager"}
+
+    About the sender:
+    {user_profile}
+
+    Write a short cold email (max 120 words).
+    - Reference something specific from their post
+    - Sound human, not like a bot
+    - No "I hope this email finds you well"
+    - End with one simple call to action
+    - Attach mention of resume
+
+    Only output the email body.
+    """
+
+    email_response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": email_prompt}],
         max_tokens=400
     )
-    subject_res = client.chat.completions.create(
+
+    subject_response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": subject_prompt}],
+        messages=[{"role": "user", "content": f"Write ONE email subject line under 10 words for this LinkedIn post: {post_text[:300]}. Only output the subject line."}],
         max_tokens=50
     )
+
     return {
-        "body": email_res.choices[0].message.content,
-        "subject": subject_res.choices[0].message.content.strip()
+        "body": email_response.choices[0].message.content,
+        "subject": subject_response.choices[0].message.content.strip()
     }
