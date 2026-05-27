@@ -7,16 +7,14 @@ from flask_cors import CORS
 from scraper import scrape_linkedin_post
 from ai_writer import generate_email_and_subject
 from mailer import send_email_with_token
-from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+import requests as http_requests
 
 os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey123")
-app.config["SESSION_COOKIE_SAMESITE"] = "None"
-app.config["SESSION_COOKIE_SECURE"] = True
 CORS(app, supports_credentials=True, origins="*")
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
@@ -27,12 +25,14 @@ except:
     LINKEDIN_COOKIES = {}
 
 CREDENTIALS_INFO = json.loads(os.environ.get("CREDENTIALS_JSON", "{}"))
-SCOPES = [
-    "https://www.googleapis.com/auth/gmail.send",
-    "https://www.googleapis.com/auth/gmail.readonly"
-]
 REDIRECT_URI = os.environ.get("REDIRECT_URI", "http://localhost:5000/oauth2callback")
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+
+CLIENT_ID = CREDENTIALS_INFO.get("web", {}).get("client_id", "")
+CLIENT_SECRET = CREDENTIALS_INFO.get("web", {}).get("client_secret", "")
+TOKEN_URI = "https://oauth2.googleapis.com/token"
+AUTH_URI = "https://accounts.google.com/o/oauth2/auth"
+SCOPES = "https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly"
 
 
 @app.route("/", methods=["GET"])
@@ -42,13 +42,17 @@ def home():
 
 @app.route("/auth/login", methods=["GET"])
 def auth_login():
-    flow = Flow.from_client_config(CREDENTIALS_INFO, scopes=SCOPES)
-    flow.redirect_uri = REDIRECT_URI
-    auth_url, state = flow.authorization_url(
-        access_type="offline",
-        prompt="consent",
-        code_challenge_method=None  # ✅ disables PKCE completely
-    )
+    # Build Google auth URL manually — no PKCE
+    params = {
+        "client_id": CLIENT_ID,
+        "redirect_uri": REDIRECT_URI,
+        "response_type": "code",
+        "scope": SCOPES,
+        "access_type": "offline",
+        "prompt": "consent"
+    }
+    from urllib.parse import urlencode
+    auth_url = AUTH_URI + "?" + urlencode(params)
     return jsonify({"auth_url": auth_url})
 
 
@@ -57,14 +61,32 @@ def oauth2callback():
     try:
         code = request.args.get("code")
         if not code:
-            return redirect(f"{FRONTEND_URL}?error=no_code")
+            return redirect(f"{FRONTEND_URL}?error=no_code_received")
 
-        flow = Flow.from_client_config(CREDENTIALS_INFO, scopes=SCOPES)
-        flow.redirect_uri = REDIRECT_URI
+        # Exchange code for token manually — no PKCE
+        token_response = http_requests.post(TOKEN_URI, data={
+            "code": code,
+            "client_id": CLIENT_ID,
+            "client_secret": CLIENT_SECRET,
+            "redirect_uri": REDIRECT_URI,
+            "grant_type": "authorization_code"
+        })
 
-        # ✅ Fetch token using just the code — no state or PKCE needed
-        flow.fetch_token(code=code)
-        creds = flow.credentials
+        token_data = token_response.json()
+        print("Token response:", token_data)
+
+        if "error" in token_data:
+            return redirect(f"{FRONTEND_URL}?error={token_data['error']}")
+
+        # Build credentials object
+        creds = Credentials(
+            token=token_data["access_token"],
+            refresh_token=token_data.get("refresh_token"),
+            token_uri=TOKEN_URI,
+            client_id=CLIENT_ID,
+            client_secret=CLIENT_SECRET,
+            scopes=SCOPES.split()
+        )
 
         token_b64 = base64.b64encode(pickle.dumps(creds)).decode("utf-8")
 
