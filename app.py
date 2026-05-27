@@ -1,19 +1,22 @@
-
+import os
+import json
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from scraper import scrape_linkedin_post
 from ai_writer import generate_email_and_subject
 from mailer import send_email
-import os
-import json
 
 app = Flask(__name__)
 CORS(app)
 
-# Load config from environment variables (set these on Railway)
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-HUNTER_API_KEY = os.environ.get("HUNTER_API_KEY")
-LINKEDIN_COOKIES = json.loads(os.environ.get("LINKEDIN_COOKIES", "{}"))
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+HUNTER_API_KEY = os.environ.get("HUNTER_API_KEY", "")
+
+raw_cookies = os.environ.get("LINKEDIN_COOKIES", "{}")
+try:
+    LINKEDIN_COOKIES = json.loads(raw_cookies)
+except:
+    LINKEDIN_COOKIES = {}
 
 @app.route("/", methods=["GET"])
 def home():
@@ -21,20 +24,14 @@ def home():
 
 @app.route("/generate", methods=["POST"])
 def generate():
-    """
-    Takes LinkedIn URL + user profile
-    Returns AI-written email preview
-    """
     try:
         data = request.json
         linkedin_url = data.get("linkedin_url")
         user_profile = data.get("user_profile")
         hr_name = data.get("hr_name", "")
 
-        # Scrape LinkedIn post
         post_data = scrape_linkedin_post(linkedin_url, LINKEDIN_COOKIES)
 
-        # Generate email with AI
         result = generate_email_and_subject(
             post_text=post_data["full_text"],
             hr_name=hr_name,
@@ -56,10 +53,6 @@ def generate():
 
 @app.route("/send", methods=["POST"])
 def send():
-    """
-    Takes email content + resume file
-    Actually sends the email
-    """
     try:
         hr_email = request.form.get("hr_email")
         subject = request.form.get("subject")
@@ -73,7 +66,6 @@ def send():
         resume_filename = resume.filename
 
         send_email(hr_email, subject, body, resume_bytes, resume_filename)
-
         return jsonify({"success": True, "message": f"Email sent to {hr_email}!"})
 
     except Exception as e:
