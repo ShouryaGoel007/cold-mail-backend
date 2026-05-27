@@ -2,7 +2,7 @@ import os
 import json
 import base64
 import pickle
-from flask import Flask, request, jsonify, redirect, session
+from flask import Flask, request, jsonify, redirect
 from flask_cors import CORS
 from scraper import scrape_linkedin_post
 from ai_writer import generate_email_and_subject
@@ -17,7 +17,6 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey123")
 app.config["SESSION_COOKIE_SAMESITE"] = "None"
 app.config["SESSION_COOKIE_SECURE"] = True
-
 CORS(app, supports_credentials=True, origins="*")
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
@@ -45,12 +44,10 @@ def home():
 def auth_login():
     flow = Flow.from_client_config(CREDENTIALS_INFO, scopes=SCOPES)
     flow.redirect_uri = REDIRECT_URI
-    # Pass state directly in URL instead of session
     auth_url, state = flow.authorization_url(
         access_type="offline",
-        include_granted_scopes="true",
         prompt="consent",
-        state="coldmailstate123"  # fixed state instead of session
+        code_challenge_method=None  # ✅ disables PKCE completely
     )
     return jsonify({"auth_url": auth_url})
 
@@ -58,20 +55,15 @@ def auth_login():
 @app.route("/oauth2callback", methods=["GET"])
 def oauth2callback():
     try:
-        # Use fixed state — no session needed
-        flow = Flow.from_client_config(
-            CREDENTIALS_INFO,
-            scopes=SCOPES,
-            state="coldmailstate123"
-        )
+        code = request.args.get("code")
+        if not code:
+            return redirect(f"{FRONTEND_URL}?error=no_code")
+
+        flow = Flow.from_client_config(CREDENTIALS_INFO, scopes=SCOPES)
         flow.redirect_uri = REDIRECT_URI
 
-        # Get the full URL including https
-        auth_response = request.url
-        if auth_response.startswith("http://"):
-            auth_response = auth_response.replace("http://", "https://", 1)
-
-        flow.fetch_token(authorization_response=auth_response)
+        # ✅ Fetch token using just the code — no state or PKCE needed
+        flow.fetch_token(code=code)
         creds = flow.credentials
 
         token_b64 = base64.b64encode(pickle.dumps(creds)).decode("utf-8")
