@@ -3,30 +3,28 @@ from groq import Groq
 def generate_email_and_subject(post_text, hr_name, user_profile, groq_api_key):
     client = Groq(api_key=groq_api_key)
 
-    email_prompt = f\"\"\"
-You are helping someone write a cold email to an HR professional.
+    email_prompt = (
+        "You are helping someone write a cold email to an HR professional.\n\n"
+        "The HR posted this on LinkedIn:\n---\n"
+        + post_text[:2000] +
+        "\n---\n\n"
+        "HR name: " + (hr_name if hr_name else "HR Manager") + "\n\n"
+        "About the sender:\n"
+        + user_profile +
+        "\n\nWrite a short cold email (max 120 words).\n"
+        "- Reference something specific from their post\n"
+        "- Sound human, not like a bot\n"
+        "- No I hope this email finds you well\n"
+        "- End with one simple call to action\n"
+        "- Mention resume is attached\n\n"
+        "Only output the email body. Nothing else."
+    )
 
-The HR posted this on LinkedIn:
----
-{post_text[:2000]}
----
-
-HR name: {hr_name if hr_name else "HR Manager"}
-
-About the sender:
-{user_profile}
-
-Write a short cold email (max 120 words).
-- Reference something specific from their post
-- Sound human, not like a bot
-- No "I hope this email finds you well"
-- End with one simple call to action
-- Mention resume is attached
-
-Only output the email body. Nothing else.
-\"\"\"
-
-    subject_prompt = f"Write ONE email subject line under 10 words for this LinkedIn post: {post_text[:300]}. Only output the subject."
+    subject_prompt = (
+        "Write ONE email subject line under 10 words for this LinkedIn post: "
+        + post_text[:300] +
+        ". Only output the subject line."
+    )
 
     email_res = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
